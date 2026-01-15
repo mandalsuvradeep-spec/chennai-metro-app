@@ -46,25 +46,28 @@ def get_full_route(start, end):
     start_blue, end_blue = start in blue_line, end in blue_line
     start_green, end_green = start in green_line, end in green_line
 
+    # 1. Direct Routes
     if (start_blue and end_blue) and not (start_green and end_green):
         return get_path_segment(blue_line, start, end), "Direct (Blue Line)"
     if (start_green and end_green) and not (start_blue and end_blue):
         return get_path_segment(green_line, start, end), "Direct (Green Line)"
     
+    # 2. Interchange Routes
     interchanges = ['Alandur', 'Central Metro']
     min_len, best_path, switch_at = 100, [], ""
 
     for x in interchanges:
-        line1 = blue_line if start_blue else green_line
-        line2 = blue_line if x in blue_line else green_line 
-        if x not in line1: line1 = green_line
-        if x not in line2: line2 = green_line
-
+        # Smart Line Selection:
+        # Use Blue line if both Start and X are in Blue, otherwise Green
+        line1 = blue_line if (start in blue_line and x in blue_line) else green_line
+        # Use Blue line if both End and X are in Blue, otherwise Green
+        line2 = blue_line if (end in blue_line and x in blue_line) else green_line
+        
         leg1 = get_path_segment(line1, start, x)
         leg2 = get_path_segment(line2, x, end)
         
         if leg1 and leg2:
-            full = leg1 + leg2[1:]
+            full = leg1 + leg2[1:] # Combine and remove duplicate interchange station
             if len(full) < min_len:
                 min_len = len(full)
                 best_path = full
@@ -96,7 +99,7 @@ with col3:
     st.markdown(f"**🛑 Stops:** {stops}")
     st.info(f"Route: {msg}")
 
-# --- 4. MAP VISUALIZATION (VISUAL UPGRADE) ---
+# --- 4. MAP VISUALIZATION ---
 if len(path) > 0:
     route_coords = []
     for s in path:
@@ -104,34 +107,33 @@ if len(path) > 0:
             lat, lon = station_coords[s]
             route_coords.append([lon, lat])
 
-    # 1. Path Layer (Thinner, Gold/Orange Color)
+    # 1. Path Layer
     layer_path = pdk.Layer(
         "PathLayer",
         data=[{"path": route_coords}],
         get_path="path",
-        get_color=[255, 165, 0], # <-- CHANGED TO GOLD/ORANGE
-        get_width=250,           # <-- CHANGED THICKNESS (was 600)
+        get_color=[255, 165, 0], # Gold/Orange
+        get_width=250,
         width_min_pixels=3,
         pickable=True
     )
 
-    # 2. Scatter Layer (Stations remain red)
+    # 2. Scatter Layer
     layer_scatter = pdk.Layer(
         "ScatterplotLayer",
         data=[{"position": [lon, lat], "name": s} for s, [lat, lon] in station_coords.items() if s in path],
         get_position="position",
-        get_color=[255, 50, 50], # Bright Red
+        get_color=[255, 50, 50],
         get_radius=250, 
         pickable=True,
     )
 
-    # 3. View State (2D Top-Down)
+    # 3. View State
     view_state = pdk.ViewState(
         latitude=route_coords[len(route_coords)//2][1],
         longitude=route_coords[len(route_coords)//2][0],
         zoom=12, 
         pitch=0,
-        bearing=0
     )
 
     # 4. RENDER MAP
