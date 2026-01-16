@@ -1,5 +1,6 @@
 import streamlit as st
 import pydeck as pdk
+import datetime  # Added for Phase 6 Logic
 
 # --- 1. DATA: STATIONS & COORDINATES ---
 station_coords = {
@@ -35,7 +36,7 @@ green_line = [
 
 all_stations = sorted(list(station_coords.keys()))
 
-# --- 2. LOGIC ---
+# --- 2. LOGIC FUNCTIONS ---
 def get_path_segment(line, start, end):
     if start not in line or end not in line: return []
     idx_s = line.index(start)
@@ -57,23 +58,40 @@ def get_full_route(start, end):
     min_len, best_path, switch_at = 100, [], ""
 
     for x in interchanges:
-        # Smart Line Selection:
-        # Use Blue line if both Start and X are in Blue, otherwise Green
         line1 = blue_line if (start in blue_line and x in blue_line) else green_line
-        # Use Blue line if both End and X are in Blue, otherwise Green
         line2 = blue_line if (end in blue_line and x in blue_line) else green_line
         
         leg1 = get_path_segment(line1, start, x)
         leg2 = get_path_segment(line2, x, end)
         
         if leg1 and leg2:
-            full = leg1 + leg2[1:] # Combine and remove duplicate interchange station
+            full = leg1 + leg2[1:] 
             if len(full) < min_len:
                 min_len = len(full)
                 best_path = full
                 switch_at = x
                 
     return best_path, f"Switch at {switch_at}"
+
+# --- PHASE 6: TIME LOGIC ---
+def get_train_info():
+    now = datetime.datetime.now()
+    current_hour = now.hour
+    
+    # Logic: Peak hours (8-11 AM & 5-8 PM) have freq of 5 mins, else 15 mins
+    if 8 <= current_hour <= 11 or 17 <= current_hour <= 20:
+        frequency = 5
+        status = "🚫 Peak Hours (Crowded)"
+    else:
+        frequency = 15
+        status = "✅ Off-Peak (Seats Available)"
+        
+    # Calculate next train
+    minutes_past = now.minute
+    next_train_min = (minutes_past // frequency + 1) * frequency
+    wait_time = next_train_min - minutes_past
+    
+    return wait_time, status
 
 # --- 3. UI SETUP ---
 st.set_page_config(page_title="Chennai Metro", page_icon="🚇", layout="wide")
@@ -97,6 +115,13 @@ else: fare = 50
 with col3:
     st.markdown(f"### 🎫 Fare: ₹{fare}")
     st.markdown(f"**🛑 Stops:** {stops}")
+    
+    # PHASE 6 DISPLAY (Now integrated here)
+    wait_time, status = get_train_info()
+    st.divider()
+    st.markdown(f"**🕒 Next Train:** in {wait_time} mins")
+    st.caption(f"{status}")
+    
     st.info(f"Route: {msg}")
 
 # --- 4. MAP VISUALIZATION ---
@@ -107,18 +132,16 @@ if len(path) > 0:
             lat, lon = station_coords[s]
             route_coords.append([lon, lat])
 
-    # 1. Path Layer
     layer_path = pdk.Layer(
         "PathLayer",
         data=[{"path": route_coords}],
         get_path="path",
-        get_color=[255, 165, 0], # Gold/Orange
+        get_color=[255, 165, 0],
         get_width=250,
         width_min_pixels=3,
         pickable=True
     )
 
-    # 2. Scatter Layer
     layer_scatter = pdk.Layer(
         "ScatterplotLayer",
         data=[{"position": [lon, lat], "name": s} for s, [lat, lon] in station_coords.items() if s in path],
@@ -128,7 +151,6 @@ if len(path) > 0:
         pickable=True,
     )
 
-    # 3. View State
     view_state = pdk.ViewState(
         latitude=route_coords[len(route_coords)//2][1],
         longitude=route_coords[len(route_coords)//2][0],
@@ -136,7 +158,6 @@ if len(path) > 0:
         pitch=0,
     )
 
-    # 4. RENDER MAP
     st.pydeck_chart(pdk.Deck(
         map_style=None, 
         initial_view_state=view_state,
