@@ -8,6 +8,7 @@ A web application that calculates fares, distances, and visualizes routes betwee
 * **Route Finder:** Select any two stations to see the best route.
 * **Smart Interchange:** Automatically detects if you need to switch between Blue/Green lines at Alandur or Central.
 * **Fare Calculator:** Calculates the ticket price based on current distance rates.
+* **Real-time Scheduler:** Simulates next train timings and detects Peak vs. Off-Peak hours using live time data.
 * **Interactive Map:** Visualizes the exact path on a map using PyDeck (Gold path with Red station markers).
 
 ## 🛠️ Tech Stack
